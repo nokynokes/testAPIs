@@ -5,9 +5,29 @@
 # The exit statuses indiacte problems and are suitable for nagios 
 
 BASENAME=$(basename $0) 
-# if [[ $1 == '-h' || $1 == '--help' ]]; then
-# 	# Usage info will go here
-# fi
+if [[ $1 == '-h' || $1 == '--help' ]]; then
+	cat <<EOF
+USAGE: $BASENAME  -w [WARNINGTIME] -c [CRITICALTIME] -u [USER] -p [PASSWORD] -e [ENV] 
+
+Overview:
+The Purpose of this script is to make API calls to lmsmanager to see if they are up and running. This is accompished by using a serries of curl commands that logs into the lmsmanager app, getting past the authorization, then making a series of curl calls to the apis. The script looks for 200's reponse codes to confirm the apis are working as intended
+
+Flags:
+ -w  or  --warning ----> Set the warning time threshold 
+ -c  or  --critical ----> Set the cricital time threshold	
+ -u  or  --user ---> Set the login name
+ -p  or  --password ---> Set the password
+ -e  or  --environment ---> Set the environment to monitor (test or dev)
+
+Exit statuses (Nagios Plugin API):
+  0  - OK
+  1  - Warning (not all of apis returned with 200's)
+  2  - Critical (could not finish AUTH)
+  3  - Unknown (process could not finish correctly)
+
+EOF
+exit 1
+fi
 
 USER=
 PASS=
@@ -18,6 +38,7 @@ MSG=
 
 if [ $# -eq 0 ]; then
 	echo "Incorrect usage, type ./$BASENAME -h or ./$BASENAME --help on how to use this script"
+	exit 1
 fi
 
  
@@ -103,20 +124,18 @@ if [[ $STATUS -eq 0 ]]; then
 fi
 ########################################################################################################################################
  
-declare -A table
+# declare -A table
 
 
-if [[ $STATUS -eq 0 ]]; then
+# if [[ $STATUS -eq 0 ]]; then
 	
-	# test 1 : ManageLMS
-	MG="rest/ManageLMS"
-	$(curl -s -L -b -D header.txt ${COOKIEJAR} ${LMS}/${MG}/ -o output)
+# 	# test 1 : ManageLMS
 
 
 	
-fi
+# fi
 
 
 
-echo $MSG $STATUS
+echo $MSG
 exit $STATUS
