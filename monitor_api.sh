@@ -7,6 +7,7 @@
 BASENAME=$(basename $0) 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
 	cat <<EOF
+
 USAGE: $BASENAME  -w [WARNINGTIME] -c [CRITICALTIME] -u [USER] -p [PASSWORD] -e [ENV] 
 
 Overview:
@@ -17,7 +18,7 @@ Flags:
  -c  or  --critical ----> Set the cricital time threshold	
  -u  or  --user ---> Set the login name
  -p  or  --password ---> Set the password
- -e  or  --environment ---> Set the environment to monitor (test or dev)
+ -e  or  --environment ---> Set the environment to monitor (test/dev/prod)
 
 Exit statuses (Nagios Plugin API):
   0  - OK
@@ -31,8 +32,8 @@ fi
 
 USER=
 PASS=
-WARNINGTIME=
-CRITICALTIME=
+WARNINGTIME=10
+CRITICALTIME=20
 ENV= 
 MSG=
 
@@ -71,8 +72,15 @@ do
 done
 
 #############################################
-LMS="https://lmsmanager-$ENV.colorado.edu/LMSManager"
-FedAuth="https://fedauth-test.colorado.edu"
+case "$ENV" in
+	dev ) LMS="https://lmsmanager-dev.colorado.edu/LMSManager"; FedAuth="https://fedauth-test.colorado.edu"; 
+	;;
+	test ) LMS="https://lmsmanager-test.colorado.edu/LMSManager"; FedAuth="https://fedauth-test.colorado.edu";
+	;;
+	prod ) LMS="https://lmsmanager.colorado.edu/LMSManager"; FedAuth="https://fedauth.colorado.edu";
+	;;
+esac
+
 startTime=$(date +"%s")
 
 STATUS=0
@@ -85,9 +93,18 @@ HTML=$(curl -L -sS -c ${COOKIEJAR} -w 'LAST_URL:%{url_effective}' ${LMS}/Fun.htm
 AUTHURL=$(echo $HTML | sed -e 's/.*LAST_URL:\(.*\)$/\1/')
 
 ## Verify redirect
-if [[ ${AUTHURL:0:33} != "$FedAuth" ]]; then
-	MSG=${MSG:-"CRITICAL: No redirect Detected. Authorization Failed"}
-	STATUS=2
+SIZE=${#AUTHURL}
+if [[ "$SIZE" -lt 123 ]]; then
+	if [[ "${AUTHURL:0:28}" != "$FedAuth" ]]; then
+		MSG=${MSG:-"CRITICAL: No redirect Detected. Authorization Failed"}
+		STATUS=2
+	fi
+else
+	if [[ "${AUTHURL:0:33}" != "$FedAuth" ]]; then
+		MSG=${MSG:-"CRITICAL: No redirect Detected. Authorization Failed"}
+		STATUS=2
+	fi
+	
 fi
 
 if [[ $STATUS -eq 0 ]]; then
@@ -123,19 +140,31 @@ if [[ $STATUS -eq 0 ]]; then
   	fi
 fi
 ########################################################################################################################################
- 
-# declare -A table
+rm -f header.txt
+################################################## Monitor APIS ##############################################################
 
 
-# if [[ $STATUS -eq 0 ]]; then
+MANAGE="rest/ManageLMS"
+CREATE="rest/CreateLMS"
+CREATECMTY="rest/CreateLMS/initCommunityCourse"
+ADDSEC="rest/AddSections"
+BATCH="rest/BatchLMS"
+BATCH2="rest/BatchLMS/process"
+typeset -A TABLE
+
+if [[ $STATUS -eq 0 ]]; then
 	
-# 	# test 1 : ManageLMS
-
-
+	# test 1 : ManageLMS
+	$(curl -L -sS -b ${COOKIEJAR} -c ${COOKIEJAR} -D header.txt ${LMS}/${MANAGE}/APPM1350/300/20164/BCS)
+	respCode="$(grep 'HTTP/1.1' header.txt | cut -f2 -d ' ')"
+	TABLE[ManageLMS]=$respCode
 	
-# fi
+fi
+
+for key in "${!TABLE[@]}"; do
+	echo "$key"
+done
 
 
-
-echo $MSG
+echo $STATUS - $MSG
 exit $STATUS
